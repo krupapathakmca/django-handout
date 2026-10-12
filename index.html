@@ -237,6 +237,26 @@
   }
   .practice-block p{margin:0; font-size:14.5px; color:var(--ink);}
 
+  .flow{margin:18px 0 8px; max-width:440px;}
+  .flow-step{
+    border:1px solid var(--line); background:var(--paper-raised); border-radius:8px;
+    padding:10px 16px; border-left-width:4px;
+  }
+  .flow-step.you{border-left-color:var(--spark);}
+  .flow-step.dj{border-left-color:var(--forest);}
+  .flow-step b{display:block; font-size:14.5px; font-weight:600;}
+  .flow-step span{color:var(--ink-soft); font-size:13px;}
+  .flow-arrow{text-align:center; color:var(--ink-faint); font-size:15px; line-height:1.6;}
+  .flow-key{font-size:12.5px; color:var(--ink-soft); margin:0 0 20px; max-width:440px;}
+
+  .symtable{border-collapse:collapse; width:100%; max-width:600px; margin:14px 0 20px; font-size:14px;}
+  .symtable th, .symtable td{
+    border-bottom:1px solid var(--line); padding:10px 12px 10px 0; text-align:left; vertical-align:top;
+  }
+  .symtable th{font-size:12.5px; color:var(--ink-soft); font-weight:600;}
+  .symtable code{font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--forest);}
+  .tpl{color:#e8a33d;}
+
   footer{
     border-top:1px solid var(--line); padding:34px 28px; margin-top:20px;
     font-size:13px; color:var(--ink-faint); max-width:760px; margin-left:auto; margin-right:auto;
@@ -301,7 +321,8 @@
     <a href="#install"><span class="n">3</span> Install</a>
     <a href="#files"><span class="n">4</span> Three files to know</a>
     <a href="#first-app"><span class="n">5</span> Build the project</a>
-    <a href="#next"><span class="n">6</span> What's next</a>
+    <a href="#forms"><span class="n">6</span> Form handling</a>
+    <a href="#next"><span class="n">7</span> What's next</a>
   </div>
 </nav>
 
@@ -605,15 +626,200 @@ urlpatterns = [
     </div>
   </section>
 
-  <section id="next">
+  <section id="forms">
     <div class="sec-num">6</div>
+    <div class="sec-body">
+      <h2>Form handling</h2>
+      <p class="lede">How a page can ask the user for something, and how Django reads the answer.</p>
+      <p>So far, every page you built only <em>sends</em> something to the browser. A form works in
+      both directions: the user types something, clicks a button, and what they typed travels back
+      to your view. Reading that data is called <strong>form handling</strong>. You already know
+      HTML forms — the only new part is how Django receives what the form sends.</p>
+
+      <h3 class="first">The idea: one address, two jobs</h3>
+      <p>A form page uses the same address twice — once to <em>show</em> the empty form, and once to
+      <em>receive</em> the filled-in form. The browser tells Django which job it is by the type of
+      request it sends: <strong>GET</strong> means "show me the page", <strong>POST</strong> means
+      "here is the data the user typed".</p>
+
+      <div class="flow">
+        <div class="flow-step you"><b>The user opens /simple-form/</b><span>The browser sends a GET request: "show me the page".</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>Django runs your view</b><span>It sees GET, so it sends back the page with an empty form.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step you"><b>The user types a name and clicks Send</b><span>The browser sends a POST request carrying the typed data.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>Django runs the same view again</b><span>It sees POST, reads the name from <code>request.POST</code>, and passes it to the template.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>The template shows the result</b><span>The same page comes back, now with a greeting under the form.</span></div>
+      </div>
+      <p class="flow-key">Amber boxes are what the user does. Green boxes are what Django does.</p>
+
+      <h3>Build it, step by step</h3>
+      <p>We'll make the smallest form possible: one box, and the page greets whatever name you type.
+      It continues the same project, using the <code>hello</code> app and the shared
+      <code>templates</code> folder from Part 2.</p>
+
+      <p><strong>Step 1 — create the template.</strong> Make a new file called
+      <code>simple_form.html</code> inside the <code>templates</code> folder, next to
+      <code>greet.html</code>. The amber text is Django's own template language, explained just below.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/simple_form.html</span></div>
+        <pre>&lt;h2&gt;What is your name?&lt;/h2&gt;
+
+&lt;form method="POST"&gt;
+  <span class="tpl">{% csrf_token %}</span>
+  &lt;input type="text" name="username"&gt;
+  &lt;button type="submit"&gt;Send&lt;/button&gt;
+&lt;/form&gt;
+
+<span class="tpl">{% if username %}</span>
+  &lt;h3&gt;Hello, <span class="tpl">{{ username }}</span>!&lt;/h3&gt;
+<span class="tpl">{% endif %}</span></pre>
+      </div>
+
+      <p><strong>Step 2 — add the view.</strong> Add this below your existing view in
+      <code>hello/views.py</code>. The <code>render</code> import from Part 2 is already at the top.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py</span></div>
+        <pre><span class="kw">def</span> <span class="fn">simple_form</span>(request):
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        username = request.POST.get(<span class="str">'username'</span>)
+        <span class="kw">return</span> render(request, <span class="str">'simple_form.html'</span>, {<span class="str">'username'</span>: username})
+    <span class="kw">return</span> render(request, <span class="str">'simple_form.html'</span>)</pre>
+      </div>
+
+      <p><strong>Step 3 — add the URL.</strong> Add one line to the list in
+      <code>myfirstsite/urls.py</code>.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">myfirstsite/urls.py</span></div>
+        <pre>urlpatterns = [
+    path(<span class="str">'admin/'</span>, admin.site.urls),
+    path(<span class="str">'hello/'</span>, views.greet, name=<span class="str">'greet'</span>),
+    path(<span class="str">'simple-form/'</span>, views.simple_form, name=<span class="str">'simple_form'</span>),
+]</pre>
+      </div>
+
+      <p><strong>Step 4 — run it and test.</strong> The server reloads by itself. Open the new address:
+      you see an empty box. Type a name, click Send, and a greeting appears under the form.</p>
+
+      <div class="browser">
+        <div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/simple-form/</span></div>
+        <div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+          <div style="font-size:20px; font-weight:bold; margin-bottom:12px;">What is your name?</div>
+          <span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">&nbsp;</span>
+          <span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:3px 8px; margin-left:4px;">Send</span>
+        </div>
+      </div>
+      <p class="result-note"><strong>First visit (GET):</strong> an empty form, and no greeting.</p>
+
+      <div class="browser">
+        <div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/simple-form/</span></div>
+        <div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+          <div style="font-size:20px; font-weight:bold; margin-bottom:12px;">What is your name?</div>
+          <span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">Riya</span>
+          <span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:3px 8px; margin-left:4px;">Send</span>
+          <div style="font-size:17px; font-weight:bold; margin-top:16px;">Hello, Riya!</div>
+        </div>
+      </div>
+      <p class="result-note"><strong>After Send (POST):</strong> the same page, now with a greeting.</p>
+
+      <h3>How the view works, in four sentences</h3>
+      <p>1. When you open the page, the request is a GET, so the <code>if</code> is false and Django
+      shows the empty form.<br>
+      2. When you click Send, the same address receives a POST, so the <code>if</code> is true.<br>
+      3. <code>request.POST.get('username')</code> takes out the value typed in the box whose
+      <code>name</code> is <code>username</code>.<br>
+      4. That value goes to the template as <code>{'username': username}</code>, and
+      <code>{{ username }}</code> prints it.</p>
+
+      <h3>What do the curly brackets mean?</h3>
+      <p>The symbols in the template are not Python and not HTML. They belong to the
+      <strong>Django template language</strong> — short instructions for Django, which reads and
+      replaces them before the page reaches the browser. The browser never sees the brackets.</p>
+
+      <table class="symtable">
+        <tr><th>You write</th><th>Name</th><th>What it does</th></tr>
+        <tr><td><code>{{ username }}</code></td><td>Variable</td><td>Prints a value the view sent</td></tr>
+        <tr><td><code>{% if username %}</code> … <code>{% endif %}</code></td><td>Tag</td><td>Shows the block only when there is a value</td></tr>
+        <tr><td><code>{% csrf_token %}</code></td><td>Tag</td><td>Adds a hidden security code to the form</td></tr>
+      </table>
+
+      <div class="callout"><p><strong>Easy to remember:</strong> double curly brackets <em>show</em>
+      something. Percent signs <em>do</em> something.</p></div>
+
+      <p><code>{% if %}</code> decides whether to show a block. On the first visit the view sends no
+      name, so Django skips the greeting. After Send, there is a name, so the greeting appears.
+      Every <code>{% if %}</code> needs its own <code>{% endif %}</code>, because HTML has no
+      indentation rule to mark where the block ends.</p>
+      <p><code>{% csrf_token %}</code> is a security stamp. Django puts a secret code inside every form
+      it gives out, and checks it when the form comes back. A fake website can't copy the code, so its
+      form is rejected. The rule to remember: <strong>every POST form needs
+      <code>{% csrf_token %}</code></strong>.</p>
+
+      <div class="callout"><p><strong>See it for yourself:</strong> after submitting, right-click the page and choose
+      "View page source". There are no curly brackets left — Django already replaced them with plain
+      HTML.</p></div>
+
+      <h3>Break it on purpose</h3>
+      <p>Breaking the page teaches more than the working version does. Try each of these, then undo it.</p>
+
+      <div class="practice-block">
+        <span class="qlabel">TRY 1</span>
+        <p>Delete <code>{% csrf_token %}</code> and click Send. You get a <strong>403 Forbidden</strong>
+        error, because Django rejects a form without its security stamp. Put the line back.</p>
+      </div>
+
+      <div class="practice-block">
+        <span class="qlabel">TRY 2</span>
+        <p>Change the input to <code>name="uname"</code> and leave the view alone. Click Send and
+        nothing is greeted. The view still asks for <code>username</code>, but the form now sends
+        <code>uname</code>. The <code>name</code> in the HTML and the key in
+        <code>request.POST.get()</code> must match.</p>
+      </div>
+
+      <div class="practice-block">
+        <span class="qlabel">TRY 3</span>
+        <p>Change <code>method="POST"</code> to <code>method="GET"</code>. After Send, the typed name
+        shows up in the address bar. That is why passwords and personal details are never sent with GET.</p>
+      </div>
+
+      <p>One more thing you'll notice: if you refresh the page after sending, the browser asks to
+      "resubmit the form". That is normal, and it is fixed later in the course.</p>
+
+      <h3>Practice — try these on your own</h3>
+
+      <div class="practice-block">
+        <span class="qlabel">Q1</span>
+        <p>Add a second input called <code>roll_no</code> and greet with both, for example
+        "Hello, Riya (Roll no: 24BCA008)!".</p>
+      </div>
+
+      <div class="practice-block">
+        <span class="qlabel">Q2</span>
+        <p>Until a name has been sent, show "Type your name above" under the form. Hint: put
+        <code>{% else %}</code> between <code>{% if username %}</code> and <code>{% endif %}</code>.</p>
+      </div>
+
+      <div class="practice-block">
+        <span class="qlabel">Q3</span>
+        <p>Make a new page at <code>/add/</code> with two number boxes that shows their sum.
+        Hint: values from a form always arrive as text, so convert each with <code>int()</code>
+        before adding.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="next">
+    <div class="sec-num">7</div>
     <div class="sec-body">
       <h2>What comes next</h2>
       <p class="lede">Once this feels comfortable, the rest of the course builds on it directly.</p>
-      <p>Coming up: storing real data with <strong>models</strong> and a database, managing that
-      data through the built-in <strong>admin panel</strong>, and accepting input from users with
-      <strong>forms</strong>. Every one of those still runs through the same loop used here — a
-      URL, a view, a template — nothing learned today gets thrown away.</p>
+      <p>Try this: submit the form, then refresh the page. The name is gone — nothing was saved.
+      Fixing that is the next topic: storing real data with <strong>models</strong> and a database,
+      then managing it through the built-in <strong>admin panel</strong>. Every one of those still runs
+      through the same loop used here — a URL, a view, a template — nothing learned so far gets
+      thrown away.</p>
     </div>
   </section>
 
