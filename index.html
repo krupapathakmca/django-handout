@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -323,7 +322,8 @@
     <a href="#files"><span class="n">4</span> Three files to know</a>
     <a href="#first-app"><span class="n">5</span> Build the project</a>
     <a href="#forms"><span class="n">6</span> Form handling</a>
-    <a href="#next"><span class="n">7</span> What's next</a>
+    <a href="#database"><span class="n">7</span> Database</a>
+    <a href="#next"><span class="n">8</span> What's next</a>
   </div>
 </nav>
 
@@ -439,7 +439,7 @@ python -m django --version</pre>
       <p>Create the project. This generates the base folder structure for your entire site.</p>
       <div class="term">
         <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">terminal</span></div>
-        <pre>python -m django startproject myfirstsite
+        <pre>django-admin startproject myfirstsite
 cd myfirstsite</pre>
       </div>
 
@@ -461,7 +461,7 @@ cd myfirstsite</pre>
       <code>hello</code>, and it's the only app we'll use for this project.</p>
       <div class="term">
         <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">terminal</span></div>
-        <pre>python -m django  startapp hello</pre>
+        <pre>python manage.py startapp hello</pre>
       </div>
 
       <p>Register the app by adding it to the settings file.</p>
@@ -811,18 +811,451 @@ urlpatterns = [
     </div>
   </section>
 
-  <section id="next">
+  <section id="database">
     <div class="sec-num">7</div>
     <div class="sec-body">
-      <h2>What comes next</h2>
-      <p class="lede">Once this feels comfortable, the rest of the course builds on it directly.</p>
-      <p>Try this: submit the form, then refresh the page. The name is gone — nothing was saved.
-      Fixing that is the next topic: storing real data with <strong>models</strong> and a database,
-      then managing it through the built-in <strong>admin panel</strong>. Every one of those still runs
-      through the same loop used here — a URL, a view, a template — nothing learned so far gets
-      thrown away.</p>
-    </div>
+      <h2>Saving data: models and the database</h2>
+      <p class="lede">So far, everything the user typed disappeared on refresh. Now we keep it — and use it to build a real Register and Login system.</p>
+
+      <p>Try the form from Part 6 again: type a name, then refresh the page. The name is gone, because
+      a view only <em>passes</em> data along — it never <em>stores</em> it. To keep data, even after the
+      server restarts, we need a <strong>database</strong>.</p>
+
+      <h3 class="first">Three words to understand first</h3>
+      <p>Think of an Excel file. A <strong>database</strong> is the whole file. A <strong>table</strong>
+      is one sheet in it, such as a sheet of members. Each <strong>row</strong> is one person, and each
+      <strong>column</strong> is one detail about that person (username, email, phone).</p>
+      <p>In Django you do not draw the sheet by hand. You write a Python class called a
+      <strong>model</strong>, and Django builds the table from it.</p>
+
+      <table class="symtable">
+        <tr><th>In Python (models.py)</th><th>In the database</th><th>Excel comparison</th></tr>
+        <tr><td>A <code>class</code> (e.g. <code>Member</code>)</td><td>A <strong>table</strong></td><td>One sheet</td></tr>
+        <tr><td>A field inside the class (e.g. <code>email</code>)</td><td>A <strong>column</strong></td><td>One column heading</td></tr>
+        <tr><td>One object made from the class</td><td>A <strong>row</strong></td><td>One line of data</td></tr>
+      </table>
+
+      <div class="callout"><p><strong>Why no SQL?</strong> Databases normally speak a language called SQL.
+      Django has a translator, the <strong>ORM</strong>, that turns your Python into SQL for you. You
+      write <code>Member.objects.create(...)</code> and Django does the rest. Your project already
+      comes with a small database file called <code>db.sqlite3</code>, so there is nothing to install.</p></div>
+
+      <h3>What we will build</h3>
+      <p>A tiny website with a <strong>Register</strong> page and a <strong>Login</strong> page. The user
+      registers with a username, email, phone number and password. A success message appears, the Login
+      page opens, and the user logs in using the details that were saved in the database.</p>
+
+      <div class="flow">
+        <div class="flow-step you"><b>Register page</b><span>The user fills username, email, phone and password, then clicks Register.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>The view saves a new row in the database</b><span>The password is scrambled first, so nobody can read it.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>"You registered successfully!" and the Login page opens</b><span>Django redirects to the Login page.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step you"><b>The user logs in</b><span>Types the username and password, then clicks Login.</span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step dj"><b>The view looks for that member in the database</b><span>If the details match, the Welcome page opens. If not, an error shows.</span></div>
+      </div>
+      <p class="flow-key">Amber boxes are what the user does. Green boxes are what Django does.</p>
+
+      <h3>Step 1 — Prepare the database</h3>
+      <p>Django itself needs a few tables (for the admin panel, for users, and so on). One command creates
+      them. This is also what clears the "18 unapplied migrations" warning you may have seen in the
+      terminal. Stop the server with <code>Ctrl + C</code> and run:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>python manage.py migrate</pre>
+</div>
+      <p>You will see a list of lines ending in <code>OK</code>. That is Django building its tables inside
+      <code>db.sqlite3</code>.</p>
+
+      <h3>Step 2 — Create a superuser</h3>
+      <p>Django comes with a ready-made <strong>admin panel</strong>: a website where you can see and edit
+      everything in your database. To enter it, you need an admin account, called a
+      <strong>superuser</strong>. There is no default one — you create it yourself.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>python manage.py createsuperuser</pre>
+</div>
+      <p>Django asks four questions:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>Username: admin
+Email address:                 (press Enter to skip)
+Password:                      (nothing appears while you type)
+Password (again):</pre>
+</div>
+      <div class="callout"><p><strong>Do not panic:</strong> when you type the password, no dots or stars
+      appear. It is still being typed. If you choose a very simple password, Django warns you; type
+      <code>y</code> to continue. For practice, <code>admin</code> and <code>admin123</code> are fine.
+      <strong>Remember them</strong> — you need them in Step 5.</p></div>
+
+      <h3>Step 3 — Create the model</h3>
+      <p>Open <code>hello/models.py</code>. Django already put one line in it. Add the class below. This
+      class <em>is</em> the design of our table.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/models.py</span></div>
+<pre><span class="kw">from</span> django.db <span class="kw">import</span> models
+
+<span class="kw">class</span> Member(models.Model):
+    username = models.CharField(max_length=50, unique=True)
+    email    = models.EmailField()
+    phone    = models.CharField(max_length=15)
+    password = models.CharField(max_length=128)
+
+    <span class="kw">def</span> __str__(self):
+        <span class="kw">return</span> self.username</pre>
+</div>
+
+      <p>Here is every line in plain words:</p>
+      <table class="symtable">
+        <tr><th>Line</th><th>Meaning</th></tr>
+        <tr><td><code>from django.db import models</code></td><td>Brings in Django's tools for building tables.</td></tr>
+        <tr><td><code>class Member(models.Model)</code></td><td>"Make a table called Member." Extending <code>models.Model</code> is what tells Django this class is a table.</td></tr>
+        <tr><td><code>username = models.CharField(...)</code></td><td>A column called <code>username</code> that holds short text.</td></tr>
+        <tr><td><code>max_length=50</code></td><td>The longest text allowed. <code>CharField</code> always needs it.</td></tr>
+        <tr><td><code>unique=True</code></td><td>No two members may share a username. Django refuses a duplicate.</td></tr>
+        <tr><td><code>EmailField()</code></td><td>Text that must look like an email address.</td></tr>
+        <tr><td><code>phone = CharField(max_length=15)</code></td><td>Stored as text, not a number, because phone numbers can start with 0 or contain +.</td></tr>
+        <tr><td><code>password = CharField(max_length=128)</code></td><td>Long on purpose: we will store a scrambled version of the password, which is much longer than what the user typed.</td></tr>
+        <tr><td><code>def __str__(self)</code></td><td>The label Django shows for each row. Without it the admin shows "Member object (1)"; with it, the username.</td></tr>
+      </table>
+      <p>You did not write an <code>id</code> column, but the table gets one anyway: Django adds a number
+      (1, 2, 3...) to every row automatically.</p>
+
+      <h3>Step 4 — Turn the model into a real table</h3>
+      <p>Writing the class does not create the table yet. It takes two commands, and the order matters:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>python manage.py makemigrations
+python manage.py migrate</pre>
+</div>
+      <table class="symtable">
+        <tr><th>Command</th><th>What it does</th></tr>
+        <tr><td><code>makemigrations</code></td><td>Reads your model and writes a <strong>plan</strong> (a file inside <code>hello/migrations/</code>). Nothing is built yet.</td></tr>
+        <tr><td><code>migrate</code></td><td>Follows the plan and <strong>builds</strong> the table in <code>db.sqlite3</code>.</td></tr>
+      </table>
+      <p>After <code>makemigrations</code> you should see something like this:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>Migrations for 'hello':
+  hello/migrations/0001_initial.py
+    + Create model Member</pre>
+</div>
+      <div class="callout"><p><strong>Rule to remember:</strong> every time you add or change something in
+      <code>models.py</code>, run <code>makemigrations</code> and then <code>migrate</code>. If you
+      forget, the database does not match your code and you get errors such as
+      <code>no such table</code>.</p></div>
+
+      <h3>Step 5 — See it in the admin panel</h3>
+      <p>The admin does not know about your model until you register it. Open
+      <code>hello/admin.py</code> and add:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/admin.py</span></div>
+<pre><span class="kw">from</span> django.contrib <span class="kw">import</span> admin
+<span class="kw">from</span> .models <span class="kw">import</span> Member
+
+admin.site.register(Member)</pre>
+</div>
+      <p>Run <code>python manage.py runserver</code>, open
+      <code>http://127.0.0.1:8000/admin/</code> and log in with the superuser name and password from
+      Step 2. You will see <strong>Members</strong> in the list. Click it, then <strong>Add</strong>,
+      and create a test member by hand. This is your table, shown as a form — and you wrote none of the
+      HTML for it.</p>
+
+      <h3 id="why-str">Why does the admin show "Member object (1)"?</h3>
+      <p>Add two members and open the list. Instead of names, you will probably see this:</p>
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/admin/hello/member/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px; padding:0;">
+<div style="background:#417690; color:#f5dd5d; padding:8px 14px; font-size:13px;">Django administration</div><div style="padding:14px 14px 4px; font-size:17px;">Select member to change</div><div style="padding:0 14px 14px;"><table style="border-collapse:collapse; width:100%; font-size:14px;"><tr><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">MEMBER</th></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">Member object (2)</td></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">Member object (1)</td></tr></table></div>
+</div>
+</div>
+      <p class="result-note"><strong>Without <code>__str__</code>:</strong> every row has the same generic label — the table name, the word "object", and the row number.</p>
+      <p>Nothing is wrong, and the data <em>is</em> saved. Django simply does not know which column to use as
+      the row's name. A table has many columns (username, email, phone), and Django will not guess which one
+      should represent the row. You have to tell it, using a small method named <code>__str__</code>.</p>
+
+      <p><strong>The fix — add three lines inside the model class</strong> (the <code>__str__</code> in Step 3
+      already has them; if you left it out, add it now):</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/models.py</span></div>
+<pre><span class="kw">class</span> Member(models.Model):
+    username = models.CharField(max_length=<span class="str">50</span>, unique=<span class="kw">True</span>)
+    ...
+
+    <span class="kw">def</span> <span class="fn">__str__</span>(self):
+        <span class="kw">return</span> self.username</pre>
+</div>
+      <p>Save the file and refresh the admin page:</p>
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/admin/hello/member/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px; padding:0;">
+<div style="background:#417690; color:#f5dd5d; padding:8px 14px; font-size:13px;">Django administration</div><div style="padding:14px 14px 4px; font-size:17px;">Select member to change</div><div style="padding:0 14px 14px;"><table style="border-collapse:collapse; width:100%; font-size:14px;"><tr><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">MEMBER</th></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">riya24</td></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">amit_07</td></tr></table></div>
+</div>
+</div>
+      <p class="result-note"><strong>With <code>__str__</code>:</strong> each row shows its username.</p>
+
+      <table class="symtable">
+        <tr><th>Part</th><th>Meaning</th></tr>
+        <tr><td><code>def __str__(self)</code></td><td>"When someone needs to show this row as text, run this." The double underscores on both sides mark a special Python method. Python itself calls it whenever it needs a text version of an object, for example when you <code>print()</code> it.</td></tr>
+        <tr><td><code>self</code></td><td>The row being shown. <code>self.username</code> is that row's username.</td></tr>
+        <tr><td><code>return self.username</code></td><td>The text to show. You may return any field, such as <code>self.email</code>, or join two: <code>f"{self.username} - {self.phone}"</code>.</td></tr>
+      </table>
+
+      <div class="callout"><p><strong>No migration needed:</strong> <code>__str__</code> is only about how a row
+      is <em>displayed</em>. It does not add or change any column, so you do not run
+      <code>makemigrations</code> or <code>migrate</code>. Just save the file.</p></div>
+
+      <div class="callout"><p><strong>What if you skip it?</strong> Nothing breaks. Forms, views and the
+      database all work the same. The only loss is readability: with 50 members, the admin shows 50 lines
+      that all say "Member object (n)", and you cannot tell who is who without opening each one.</p></div>
+
+      <h3>Better still: show real columns</h3>
+      <p><code>__str__</code> gives each row a name. If you want the admin list to look like a real table,
+      with one column per field, add a small class in <code>admin.py</code>:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/admin.py</span></div>
+<pre><span class="kw">from</span> django.contrib <span class="kw">import</span> admin
+<span class="kw">from</span> .models <span class="kw">import</span> Member
+
+<span class="kw">class</span> MemberAdmin(admin.ModelAdmin):
+    list_display = (<span class="str">'id'</span>, <span class="str">'username'</span>, <span class="str">'email'</span>, <span class="str">'phone'</span>)
+
+admin.site.register(Member, MemberAdmin)</pre>
+</div>
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/admin/hello/member/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px; padding:0;">
+<div style="background:#417690; color:#f5dd5d; padding:8px 14px; font-size:13px;">Django administration</div><div style="padding:14px 14px 4px; font-size:17px;">Select member to change</div><div style="padding:0 14px 14px;"><table style="border-collapse:collapse; width:100%; font-size:14px;"><tr><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">ID</th><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">USERNAME</th><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">EMAIL</th><th style="background:#e4e4e4; font-size:12px; text-align:left; padding:8px 12px; color:#333;">PHONE</th></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">2</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">amit_07</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">amit@example.com</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">9123456780</td></tr><tr><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">1</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5; color:#1d5f8a; text-decoration:underline;">riya24</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">riya@example.com</td><td style="padding:8px 12px; border-bottom:1px solid #e5e5e5;">9876543210</td></tr></table></div>
+</div>
+</div>
+      <p class="result-note"><strong>With <code>list_display</code>:</strong> the list becomes a table. Add or remove field names in the brackets to choose the columns.</p>
+      <p>The two work together: <code>__str__</code> decides how a row is named everywhere (the page title,
+      dropdowns, messages), and <code>list_display</code> decides which columns the list page shows.</p>
+
+      <h3>Step 6 — The Register page</h3>
+      <p>Now the real pages. First the template. Create <code>register.html</code> in the shared
+      <code>templates</code> folder. Notice <code>type="password"</code>: it shows dots instead of the
+      letters, and <code>type="email"</code> makes the browser check the format.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/register.html</span></div>
+<pre>&lt;h2&gt;Create your account&lt;/h2&gt;
+
+<span class="tpl">{% if error %}</span>&lt;p style="color:red;"&gt;<span class="tpl">{{ error }}</span>&lt;/p&gt;<span class="tpl">{% endif %}</span>
+
+&lt;form method="POST"&gt;
+  <span class="tpl">{% csrf_token %}</span>
+  &lt;p&gt;Username: &lt;input type="text" name="username" required&gt;&lt;/p&gt;
+  &lt;p&gt;Email: &lt;input type="email" name="email" required&gt;&lt;/p&gt;
+  &lt;p&gt;Phone: &lt;input type="text" name="phone" required&gt;&lt;/p&gt;
+  &lt;p&gt;Password: &lt;input type="password" name="password" required&gt;&lt;/p&gt;
+  &lt;button type="submit"&gt;Register&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;p&gt;Already registered? &lt;a href="<span class="tpl">{% url 'login' %}</span>"&gt;Log in&lt;/a&gt;&lt;/p&gt;</pre>
+</div>
+
+      <p>Then the view. Open <code>hello/views.py</code> and add the code below. Your older views
+      stay where they are. The imports go at the top of the file.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py  (register part)</span></div>
+<pre><span class="kw">from</span> django.shortcuts <span class="kw">import</span> render, redirect
+<span class="kw">from</span> django.contrib <span class="kw">import</span> messages
+<span class="kw">from</span> django.contrib.auth.hashers <span class="kw">import</span> make_password, check_password
+<span class="kw">from</span> .models <span class="kw">import</span> Member
+
+
+<span class="kw">def</span> register(request):
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        username = request.POST.get(<span class="str">'username'</span>)
+        email = request.POST.get(<span class="str">'email'</span>)
+        phone = request.POST.get(<span class="str">'phone'</span>)
+        password = request.POST.get(<span class="str">'password'</span>)
+
+        <span class="kw">if</span> Member.objects.filter(username=username).exists():
+            <span class="kw">return</span> render(request, <span class="str">'register.html'</span>, {<span class="str">'error'</span>: <span class="str">'That username is already taken.'</span>})
+
+        Member.objects.create(
+            username=username,
+            email=email,
+            phone=phone,
+            password=make_password(password),
+        )
+        messages.success(request, <span class="str">'You registered successfully! Now log in.'</span>)
+        <span class="kw">return</span> redirect(<span class="str">'login'</span>)
+
+    <span class="kw">return</span> render(request, <span class="str">'register.html'</span>)</pre>
+</div>
+
+      <p>What each part does:</p>
+      <p>1. <code>request.POST.get(...)</code> reads the four values typed on the form, exactly as in Part 6.<br>
+      2. <code>Member.objects.filter(username=username).exists()</code> asks the database:
+      "does anyone already have this username?" If yes, we show an error and stop.<br>
+      3. <code>Member.objects.create(...)</code> adds <strong>one new row</strong> to the table. This single
+      statement is what stores the data.<br>
+      4. <code>make_password(password)</code> scrambles the password before it is saved (more on this
+      below).<br>
+      5. <code>messages.success(...)</code> leaves a one-time message for the next page, and
+      <code>redirect('login')</code> sends the browser to the Login page.</p>
+
+      <div class="callout"><p><strong>Why scramble the password?</strong> If a database is ever leaked or
+      someone peeks inside it, plain passwords would be exposed. A scrambled password (a
+      <strong>hash</strong>) cannot be turned back into the original. At login we scramble what the user
+      types and compare the two scrambled versions. Never store a real password as plain text — not even in
+      a college project.</p></div>
+
+      <h3>Step 7 — The Login page</h3>
+      <p>Create <code>login.html</code> in the same <code>templates</code> folder. The
+      <code>{% if messages %}</code> block is where "You registered successfully!" will appear.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/login.html</span></div>
+<pre>&lt;h2&gt;Log in&lt;/h2&gt;
+
+<span class="tpl">{% if messages %}</span>
+  <span class="tpl">{% for m in messages %}</span>
+    &lt;p style="color:green;"&gt;<span class="tpl">{{ m }}</span>&lt;/p&gt;
+  <span class="tpl">{% endfor %}</span>
+<span class="tpl">{% endif %}</span>
+
+<span class="tpl">{% if error %}</span>&lt;p style="color:red;"&gt;<span class="tpl">{{ error }}</span>&lt;/p&gt;<span class="tpl">{% endif %}</span>
+
+&lt;form method="POST"&gt;
+  <span class="tpl">{% csrf_token %}</span>
+  &lt;p&gt;Username: &lt;input type="text" name="username" required&gt;&lt;/p&gt;
+  &lt;p&gt;Password: &lt;input type="password" name="password" required&gt;&lt;/p&gt;
+  &lt;button type="submit"&gt;Login&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;p&gt;New here? &lt;a href="<span class="tpl">{% url 'register' %}</span>"&gt;Create an account&lt;/a&gt;&lt;/p&gt;</pre>
+</div>
+
+      <p>Add this second view below the first one in <code>hello/views.py</code>:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py  (login part)</span></div>
+<pre><span class="kw">def</span> login_view(request):
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        username = request.POST.get(<span class="str">'username'</span>)
+        password = request.POST.get(<span class="str">'password'</span>)
+
+        member = Member.objects.filter(username=username).first()
+        <span class="kw">if</span> member <span class="kw">and</span> check_password(password, member.password):
+            <span class="kw">return</span> render(request, <span class="str">'welcome.html'</span>, {<span class="str">'member'</span>: member})
+
+        <span class="kw">return</span> render(request, <span class="str">'login.html'</span>, {<span class="str">'error'</span>: <span class="str">'Wrong username or password.'</span>})
+
+    <span class="kw">return</span> render(request, <span class="str">'login.html'</span>)</pre>
+</div>
+
+      <p>The important line is <code>Member.objects.filter(username=username).first()</code>. It looks in
+      the table for a row with that username and returns it, or <code>None</code> if there is no such
+      member. Then <code>check_password</code> compares the typed password with the scrambled one stored in
+      that row. When both are right, we show the Welcome page; otherwise the Login page comes back with an
+      error.</p>
+
+      <p>Finally, the Welcome page. Create <code>welcome.html</code>. It prints values from the row we
+      found, using a dot to reach inside <code>member</code>:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/welcome.html</span></div>
+<pre>&lt;h2&gt;Welcome, <span class="tpl">{{ member.username }}</span>!&lt;/h2&gt;
+&lt;p&gt;Email: <span class="tpl">{{ member.email }}</span>&lt;/p&gt;
+&lt;p&gt;Phone: <span class="tpl">{{ member.phone }}</span>&lt;/p&gt;</pre>
+</div>
+
+      <h3>Step 8 — Add the two URLs</h3>
+      <p>Add two lines to <code>myfirstsite/urls.py</code>. The <code>name='login'</code> is what makes
+      <code>redirect('login')</code> and <code>{% url 'login' %}</code> work.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">myfirstsite/urls.py</span></div>
+<pre>urlpatterns = [
+    path(<span class="str">'admin/'</span>, admin.site.urls),
+    path(<span class="str">'hello/'</span>, views.greet, name=<span class="str">'greet'</span>),
+    path(<span class="str">'simple-form/'</span>, views.simple_form, name=<span class="str">'simple_form'</span>),
+    path(<span class="str">'register/'</span>, views.register, name=<span class="str">'register'</span>),
+    path(<span class="str">'login/'</span>, views.login_view, name=<span class="str">'login'</span>),
+]</pre>
+</div>
+
+      <h3>Step 9 — Test the whole flow</h3>
+      <p>Open <code>http://127.0.0.1:8000/register/</code> and fill the form.</p>
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/register/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+<div style="font-size:20px; font-weight:bold; margin-bottom:12px;">Create your account</div><div style="margin-bottom:8px;">Username:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">riya24&nbsp;</span></div><div style="margin-bottom:8px;">Email:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">riya@example.com&nbsp;</span></div><div style="margin-bottom:8px;">Phone:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">9876543210&nbsp;</span></div><div style="margin-bottom:8px;">Password:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&nbsp;</span></div><span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:3px 8px;">Register</span>
+</div>
+</div>
+      <p class="result-note"><strong>Step 1:</strong> fill in the details and click Register.</p>
+
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/login/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+<div style="font-size:20px; font-weight:bold; margin-bottom:12px;">Log in</div><div style="color:green; margin-bottom:10px;">You registered successfully! Now log in.</div><div style="margin-bottom:8px;">Username:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">&nbsp;</span></div><div style="margin-bottom:8px;">Password:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">&nbsp;</span></div><span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:3px 8px;">Login</span>
+</div>
+</div>
+      <p class="result-note"><strong>Step 2:</strong> the Login page opens, with the success message on top.</p>
+
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/login/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+<div style="font-size:20px; font-weight:bold; margin-bottom:12px;">Welcome, riya24!</div><div style="margin-bottom:6px;">Email: riya@example.com</div><div>Phone: 9876543210</div>
+</div>
+</div>
+      <p class="result-note"><strong>Step 3:</strong> log in with the same username and password, and the Welcome page opens.</p>
+
+      <p>Now prove the data is really stored. Open the admin panel, click <strong>Members</strong>, and
+      you will see <code>riya24</code> in the list. Open it and look at the password field: it is not
+      <code>secret123</code> but a long scrambled text starting with <code>pbkdf2_sha256$</code>. That is
+      the hash doing its job. Stop the server, start it again, and log in once more: the member is still
+      there, because the data lives in <code>db.sqlite3</code>, not in memory.</p>
+
+      <table class="symtable">
+        <tr><th>id</th><th>username</th><th>email</th><th>phone</th><th>password</th></tr>
+        <tr><td>1</td><td>riya24</td><td>riya@example.com</td><td>9876543210</td><td><code>pbkdf2_sha256$...</code></td></tr>
+      </table>
+      <p class="result-note">What the Member table looks like after one registration.</p>
+
+      <h3>Break it on purpose</h3>
+      <p>As before, you learn the most from errors. Try each, then undo it.</p>
+      <div class="practice-block">
+<span class="qlabel">TRY 1</span>
+<p>Register the same username twice. The second attempt shows "That username is already taken." Delete the <code>if ... exists()</code> check and try again: now the database itself refuses, because of <code>unique=True</code>, and Django shows an error page.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">TRY 2</span>
+<p>Add a new field, such as <code>city = models.CharField(max_length=50)</code>, and reload the register page <em>without</em> running the two migration commands. You get <code>no such column</code>. Run <code>makemigrations</code> and <code>migrate</code> and it works. (Django will ask what to do with old rows — type <code>1</code>, then <code>''</code>, to fill the new column with empty text.)</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">TRY 3</span>
+<p>Log in with a wrong password. The Login page returns with a red error. The member exists, but <code>check_password</code> returns false.</p>
+</div>
+
+      <h3>Practice — try these on your own</h3>
+      <div class="practice-block">
+<span class="qlabel">Q1</span>
+<p>Add a <code>city</code> field to the Member model and to the Register form, and show it on the Welcome page. Remember the two migration commands.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q2</span>
+<p>Make the Register page show an error if the phone number is not exactly 10 digits. Hint: <code>len(phone) != 10</code>, and check <code>phone.isdigit()</code> as well.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q3</span>
+<p>Create a model called <code>Event</code> with <code>title</code>, <code>date</code> (<code>DateField()</code>) and <code>venue</code>. Register it in <code>admin.py</code> and add three events from the admin panel.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q4</span>
+<p>Add a new page at <code>/members/</code> that lists every registered username. Hint: <code>Member.objects.all()</code> gives all rows, and the template loops with <code>{% for m in members %}</code> ... <code>{% endfor %}</code>.</p>
+</div>
+
+      <div class="practice-block">
+<span class="qlabel">Q5</span>
+<p>Remove <code>__str__</code> from your model and look at the admin list. Then add it back, this time returning <code>self.username + " (" + self.email + ")"</code>, and look again. What changed, and did you need to run a migration?</p>
+</div>
+
+     
   </section>
+
+ 
 
 </main>
 
@@ -830,5 +1263,3 @@ urlpatterns = [
 
 </body>
 </html>
-
-</body></html>
