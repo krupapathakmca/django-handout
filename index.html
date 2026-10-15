@@ -1,8 +1,8 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Django, from zero — a first project</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -324,7 +324,8 @@
     <a href="#first-app"><span class="n">5</span> Build the project</a>
     <a href="#forms"><span class="n">6</span> Form handling</a>
     <a href="#database"><span class="n">7</span> Database</a>
-    <a href="#next"><span class="n">8</span> What's next</a>
+    <a href="#crud"><span class="n">8</span> CRUD</a>
+    <a href="#next"><span class="n">9</span> What's next</a>
   </div>
 </nav>
 
@@ -1253,10 +1254,307 @@ admin.site.register(Member, MemberAdmin)</pre>
 <p>Remove <code>__str__</code> from your model and look at the admin list. Then add it back, this time returning <code>self.username + " (" + self.email + ")"</code>, and look again. What changed, and did you need to run a migration?</p>
 </div>
 
-     
+      <div class="callout"><p><strong>One honest note:</strong> this Login page checks your details, but it
+      does not <em>remember</em> you. Open another page and the site has forgotten who you are. Real websites
+      solve that with <strong>sessions</strong>, and Django also has a built-in <code>User</code> system so
+      you do not have to write all of this yourself. Both come after you are comfortable with models.</p></div>
+    </div>
   </section>
 
- 
+  <section id="crud">
+    <div class="sec-num">8</div>
+    <div class="sec-body">
+      <h2>CRUD: add, show, edit and delete</h2>
+      <p class="lede">Almost every website you use does just four things with its data. Once you can do these four, you can build most apps.</p>
+
+      <p>Look at any app on your phone — contacts, notes, a shopping cart. You <strong>add</strong> something,
+      you <strong>see</strong> a list of what you added, you <strong>change</strong> an item, and you
+      <strong>remove</strong> one. That is all. Programmers call these four jobs
+      <strong>CRUD</strong>, after their first letters.</p>
+
+      <table class="symtable">
+        <tr><th>Letter</th><th>Job</th><th>In Django</th><th>Our page</th></tr>
+        <tr><td><strong>C</strong>reate</td><td>Add a new row</td><td><code>Student.objects.create(...)</code></td><td>Add form</td></tr>
+        <tr><td><strong>R</strong>ead</td><td>Get rows to show</td><td><code>Student.objects.all()</code></td><td>Student list</td></tr>
+        <tr><td><strong>U</strong>pdate</td><td>Change an existing row</td><td>change the fields, then <code>student.save()</code></td><td>Edit form</td></tr>
+        <tr><td><strong>D</strong>elete</td><td>Remove a row</td><td><code>student.delete()</code></td><td>Delete button</td></tr>
+      </table>
+
+      <h3>What we will build</h3>
+      <p>A small <strong>Student Manager</strong>. One page lists all students. From it you can add a new
+      student, edit one, or delete one. Each job gets its own address, its own view, and (for the forms) a
+      template.</p>
+
+      <table class="symtable">
+        <tr><th>Address</th><th>Job</th><th>View</th></tr>
+        <tr><td><code>/students/</code></td><td>Show the list (Read)</td><td><code>student_list</code></td></tr>
+        <tr><td><code>/students/add/</code></td><td>Add a student (Create)</td><td><code>student_add</code></td></tr>
+        <tr><td><code>/students/3/edit/</code></td><td>Edit student number 3 (Update)</td><td><code>student_edit</code></td></tr>
+        <tr><td><code>/students/3/delete/</code></td><td>Delete student number 3 (Delete)</td><td><code>student_delete</code></td></tr>
+      </table>
+      <p>The <code>3</code> in the last two addresses is the student's <code>id</code>, the number Django gave
+      that row automatically. It is how we say <em>which</em> student we mean.</p>
+
+      <h3>Step 1 — The model</h3>
+      <p>Add this class to <code>hello/models.py</code>, below <code>Member</code>, then run the two migration
+      commands from Part 7.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/models.py</span></div>
+<pre><span class="kw">class</span> Student(models.Model):
+    name       = models.CharField(max_length=100)
+    email      = models.EmailField()
+    department = models.CharField(max_length=50)
+
+    <span class="kw">def</span> __str__(self):
+        <span class="kw">return</span> self.name</pre>
+</div><div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">Terminal</span></div>
+<pre>python manage.py makemigrations
+python manage.py migrate</pre>
+</div>
+
+      <h3>Step 2 — Read: show the list</h3>
+      <p>Reading is the easiest job, so we start there. The view asks the database for every student and hands
+      them to the template.</p>
+      <p>Open <code>hello/views.py</code> and add the imports at the top, then the first view. (All four views
+      are shown together in the next steps; add them one at a time.)</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py</span></div>
+<pre><span class="kw">from</span> django.shortcuts <span class="kw">import</span> render, redirect, get_object_or_404
+<span class="kw">from</span> .models <span class="kw">import</span> Student
+
+
+<span class="kw">def</span> student_list(request):                      <span class="cmt"> # READ</span>
+    students = Student.objects.all()
+    <span class="kw">return</span> render(request, <span class="str">'student_list.html'</span>, {<span class="str">'students'</span>: students})</pre>
+</div>
+      <p><code>Student.objects.all()</code> means "give me every row in the Student table". The result goes to
+      the template under the name <code>students</code>. Now the template. Create
+      <code>templates/student_list.html</code>:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/student_list.html</span></div>
+<pre>&lt;h2&gt;Students&lt;/h2&gt;
+&lt;p&gt;&lt;a href="<span class="tpl">{% url 'student_add' %}</span>"&gt;+ Add student&lt;/a&gt;&lt;/p&gt;
+
+&lt;table border="1" cellpadding="8"&gt;
+  &lt;tr&gt;
+    &lt;th&gt;ID&lt;/th&gt;&lt;th&gt;Name&lt;/th&gt;&lt;th&gt;Email&lt;/th&gt;&lt;th&gt;Department&lt;/th&gt;&lt;th&gt;Actions&lt;/th&gt;
+  &lt;/tr&gt;
+
+  <span class="tpl">{% for s in students %}</span>
+  &lt;tr&gt;
+    &lt;td&gt;<span class="tpl">{{ s.id }}</span>&lt;/td&gt;
+    &lt;td&gt;<span class="tpl">{{ s.name }}</span>&lt;/td&gt;
+    &lt;td&gt;<span class="tpl">{{ s.email }}</span>&lt;/td&gt;
+    &lt;td&gt;<span class="tpl">{{ s.department }}</span>&lt;/td&gt;
+    &lt;td&gt;
+      &lt;a href="<span class="tpl">{% url 'student_edit' s.id %}</span>"&gt;Edit&lt;/a&gt;
+
+      &lt;form method="POST" action="<span class="tpl">{% url 'student_delete' s.id %}</span>"
+            style="display:inline;" onsubmit="return confirm('Delete this student?');"&gt;
+        <span class="tpl">{% csrf_token %}</span>
+        &lt;button type="submit"&gt;Delete&lt;/button&gt;
+      &lt;/form&gt;
+    &lt;/td&gt;
+  &lt;/tr&gt;
+  <span class="tpl">{% empty %}</span>
+  &lt;tr&gt;&lt;td colspan="5"&gt;No students yet.&lt;/td&gt;&lt;/tr&gt;
+  <span class="tpl">{% endfor %}</span>
+&lt;/table&gt;</pre>
+</div>
+      <p>Three new template ideas, all small:</p>
+      <table class="symtable">
+        <tr><th>You write</th><th>Meaning</th></tr>
+        <tr><td><code>{% for s in students %}</code> … <code>{% endfor %}</code></td><td>Repeat the block once for each student. Inside it, <code>s</code> is the current student, so <code>{{ s.name }}</code> prints that student's name.</td></tr>
+        <tr><td><code>{% empty %}</code></td><td>What to show when the list has no students at all.</td></tr>
+        <tr><td><code>{% url 'student_edit' s.id %}</code></td><td>Builds the address for you, using the URL's <code>name</code> and filling in the id. If you later change the address, the links still work.</td></tr>
+      </table>
+
+      <h3>Step 3 — Create: add a student</h3>
+      <p>This is the Register idea from Part 7 again: show an empty form on GET, save on POST.</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py</span></div>
+<pre><span class="kw">def</span> student_add(request):                       <span class="cmt"> # CREATE</span>
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        Student.objects.create(
+            name=request.POST.get(<span class="str">'name'</span>),
+            email=request.POST.get(<span class="str">'email'</span>),
+            department=request.POST.get(<span class="str">'department'</span>),
+        )
+        <span class="kw">return</span> redirect(<span class="str">'student_list'</span>)
+    <span class="kw">return</span> render(request, <span class="str">'student_form.html'</span>)</pre>
+</div>
+      <p>After saving, <code>redirect('student_list')</code> sends the browser to the list, where the new student
+      is already visible. Redirecting also fixes the old "resubmit the form?" problem: refreshing the list page
+      no longer sends the form again.</p>
+      <p>Create <code>templates/student_form.html</code>. We write <strong>one</strong> form and use it for both
+      adding and editing:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">templates/student_form.html</span></div>
+<pre>&lt;h2&gt;<span class="tpl">{% if student %}</span>Edit student<span class="tpl">{% else %}</span>Add student<span class="tpl">{% endif %}</span>&lt;/h2&gt;
+
+&lt;form method="POST"&gt;
+  <span class="tpl">{% csrf_token %}</span>
+  &lt;p&gt;Name: &lt;input type="text" name="name" value="<span class="tpl">{{ student.name }}</span>" required&gt;&lt;/p&gt;
+  &lt;p&gt;Email: &lt;input type="email" name="email" value="<span class="tpl">{{ student.email }}</span>" required&gt;&lt;/p&gt;
+  &lt;p&gt;Department: &lt;input type="text" name="department" value="<span class="tpl">{{ student.department }}</span>" required&gt;&lt;/p&gt;
+  &lt;button type="submit"&gt;<span class="tpl">{% if student %}</span>Update<span class="tpl">{% else %}</span>Save<span class="tpl">{% endif %}</span>&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;p&gt;&lt;a href="<span class="tpl">{% url 'student_list' %}</span>"&gt;Back to list&lt;/a&gt;&lt;/p&gt;</pre>
+</div>
+      <p>Two details to notice. <code>value="{{ student.name }}"</code> puts the existing name inside the box.
+      When we are <em>adding</em>, no <code>student</code> is sent, so Django prints nothing and the box is empty.
+      When we are <em>editing</em>, the box starts filled in. And <code>{% if student %}</code> switches the
+      heading and button text between "Add" and "Edit".</p>
+
+      <h3>Step 4 — Update: edit a student</h3>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py</span></div>
+<pre><span class="kw">def</span> student_edit(request, id):                  <span class="cmt"> # UPDATE</span>
+    student = get_object_or_404(Student, id=id)
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        student.name = request.POST.get(<span class="str">'name'</span>)
+        student.email = request.POST.get(<span class="str">'email'</span>)
+        student.department = request.POST.get(<span class="str">'department'</span>)
+        student.save()
+        <span class="kw">return</span> redirect(<span class="str">'student_list'</span>)
+    <span class="kw">return</span> render(request, <span class="str">'student_form.html'</span>, {<span class="str">'student'</span>: student})</pre>
+</div>
+      <p>What each part does:</p>
+      <p>1. <code>def student_edit(request, id)</code> — the view receives the <code>id</code> from the address
+      (<code>/students/3/edit/</code> gives <code>id = 3</code>).<br>
+      2. <code>get_object_or_404(Student, id=id)</code> — fetch the one student with that id. If there is none,
+      show a proper "404 Not Found" page instead of crashing.<br>
+      3. On GET, we send that student to the form, so the boxes come pre-filled.<br>
+      4. On POST, we overwrite the three fields with what was typed, then <code>student.save()</code> writes the
+      changes to the database. Because the student already exists, <code>save()</code> <strong>updates</strong>
+      the row; it does not create a new one.</p>
+
+      <h3>Step 5 — Delete: remove a student</h3>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">hello/views.py</span></div>
+<pre><span class="kw">def</span> student_delete(request, id):                <span class="cmt"> # DELETE</span>
+    student = get_object_or_404(Student, id=id)
+    <span class="kw">if</span> request.method == <span class="str">'POST'</span>:
+        student.delete()
+    <span class="kw">return</span> redirect(<span class="str">'student_list'</span>)</pre>
+</div>
+      <p>Same idea: find the student, then <code>student.delete()</code> removes the row. Notice the delete
+      button in the list is a small <strong>form</strong> (POST), not a plain link. A link can be opened by
+      anything — a search engine, a pre-loading browser — and would silently delete your data. A POST needs a
+      deliberate button click and a <code>{% csrf_token %}</code>. The
+      <code>onsubmit="return confirm(...)</code> part pops up an "Are you sure?" box first.</p>
+
+      <h3>Step 6 — Connect the four addresses</h3>
+      <p>Add these four lines to <code>myfirstsite/urls.py</code>:</p>
+      <div class="term">
+<div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-name">myfirstsite/urls.py</span></div>
+<pre>urlpatterns = [
+    path(<span class="str">'admin/'</span>, admin.site.urls),
+    <span class="cmt"># ... your earlier paths stay here ...</span>
+    path(<span class="str">'students/'</span>, views.student_list, name=<span class="str">'student_list'</span>),
+    path(<span class="str">'students/add/'</span>, views.student_add, name=<span class="str">'student_add'</span>),
+    path(<span class="str">'students/&lt;int:id&gt;/edit/'</span>, views.student_edit, name=<span class="str">'student_edit'</span>),
+    path(<span class="str">'students/&lt;int:id&gt;/delete/'</span>, views.student_delete, name=<span class="str">'student_delete'</span>),
+]</pre>
+</div>
+      <div class="callout"><p><strong>What is <code>&lt;int:id&gt;</code>?</strong> It is a placeholder in the address.
+      <code>int</code> means "a whole number", and <code>id</code> is the name Django hands to the view. So
+      <code>/students/3/edit/</code> calls <code>student_edit(request, id=3)</code>, and
+      <code>/students/12/edit/</code> calls it with <code>id=12</code>. One line covers every student.</p></div>
+
+      <h3>Step 7 — Try all four jobs</h3>
+      <p>Open <code>http://127.0.0.1:8000/students/</code>.</p>
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/students/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+<div style="font-size:20px; font-weight:bold; margin-bottom:8px;">Students</div><div style="color:#0645ad; text-decoration:underline; margin-bottom:4px;">+ Add student</div><table style="border-collapse:collapse; font-size:13px; margin-top:10px;"><tr><th style="border:1px solid #999; padding:6px 10px; background:#f0f0f0;">ID</th><th style="border:1px solid #999; padding:6px 10px; background:#f0f0f0;">Name</th><th style="border:1px solid #999; padding:6px 10px; background:#f0f0f0;">Email</th><th style="border:1px solid #999; padding:6px 10px; background:#f0f0f0;">Department</th><th style="border:1px solid #999; padding:6px 10px; background:#f0f0f0;">Actions</th></tr><tr><td style="border:1px solid #999; padding:6px 10px;">1</td><td style="border:1px solid #999; padding:6px 10px;">Riya Shah</td><td style="border:1px solid #999; padding:6px 10px;">riya@example.com</td><td style="border:1px solid #999; padding:6px 10px;">BCA</td><td style="border:1px solid #999; padding:6px 10px;"><span style="color:#0645ad; text-decoration:underline;">Edit</span> <span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:2px 8px; font-size:13px;">Delete</span></td></tr><tr><td style="border:1px solid #999; padding:6px 10px;">2</td><td style="border:1px solid #999; padding:6px 10px;">Amit Patel</td><td style="border:1px solid #999; padding:6px 10px;">amit@example.com</td><td style="border:1px solid #999; padding:6px 10px;">BBA</td><td style="border:1px solid #999; padding:6px 10px;"><span style="color:#0645ad; text-decoration:underline;">Edit</span> <span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:2px 8px; font-size:13px;">Delete</span></td></tr></table>
+</div>
+</div>
+      <p class="result-note"><strong>Read:</strong> the list shows every student, each row with Edit and Delete.</p>
+
+      <div class="browser">
+<div class="browser-bar"><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-url">127.0.0.1:8000/students/2/edit/</span></div>
+<div class="browser-content" style="display:block; text-align:left; font-family:Arial, sans-serif; color:#000; font-size:14px;">
+<div style="font-size:20px; font-weight:bold; margin-bottom:12px;">Edit student</div><div style="margin-bottom:8px;">Name:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">Amit Patel&nbsp;</span></div><div style="margin-bottom:8px;">Email:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">amit@example.com&nbsp;</span></div><div style="margin-bottom:8px;">Department:<br><span style="display:inline-block; border:1px solid #767676; border-radius:2px; padding:3px 70px 3px 4px;">BBA&nbsp;</span></div><span style="display:inline-block; border:1px solid #767676; border-radius:2px; background:#efefef; padding:2px 8px; font-size:13px;">Update</span>
+</div>
+</div>
+      <p class="result-note"><strong>Update:</strong> the form opens with the old values already in the boxes.</p>
+
+      <p>Do this in order: click <strong>+ Add student</strong> and add two students (Create). See them in the
+      list (Read). Click <strong>Edit</strong>, change a name and press Update (Update). Click
+      <strong>Delete</strong>, confirm, and the row disappears (Delete). You have just done all of CRUD.</p>
+
+      <h3>The Django commands to remember</h3>
+      <table class="symtable">
+        <tr><th>What you want</th><th>Code</th></tr>
+        <tr><td>Every row</td><td><code>Student.objects.all()</code></td></tr>
+        <tr><td>One row, by id</td><td><code>Student.objects.get(id=3)</code></td></tr>
+        <tr><td>Rows that match</td><td><code>Student.objects.filter(department='BCA')</code></td></tr>
+        <tr><td>Add a row</td><td><code>Student.objects.create(name='Riya', ...)</code></td></tr>
+        <tr><td>Save a change</td><td><code>student.save()</code></td></tr>
+        <tr><td>Remove a row</td><td><code>student.delete()</code></td></tr>
+        <tr><td>Newest first</td><td><code>Student.objects.all().order_by('-id')</code></td></tr>
+      </table>
+      <p><code>get()</code> returns <em>one</em> row and crashes if there is none. <code>filter()</code> returns
+      a <em>list</em> of rows, empty if nothing matches. That is why the views above use
+      <code>get_object_or_404</code>, which is <code>get()</code> with a friendly error page.</p>
+
+      <h3>Break it on purpose</h3>
+      <div class="practice-block">
+<span class="qlabel">TRY 1</span>
+<p>Open <code>/students/999/edit/</code>, an id that does not exist. You see a clean <strong>404 Not Found</strong> page. Now change <code>get_object_or_404(Student, id=id)</code> to <code>Student.objects.get(id=id)</code> and try again: the site crashes with <code>DoesNotExist</code>. Put it back.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">TRY 2</span>
+<p>Remove <code>{% csrf_token %}</code> from the delete form in <code>student_list.html</code> and click Delete. You get a <strong>403 Forbidden</strong> error. The rule from Part 6 applies to every POST form.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">TRY 3</span>
+<p>In <code>student_edit</code>, delete the line <code>student.save()</code> and update a name. The page redirects as if it worked, but the list still shows the old name. Changing the Python object does not touch the database until <code>save()</code> runs.</p>
+</div>
+
+      <h3>Practice — try these on your own</h3>
+      <div class="practice-block">
+<span class="qlabel">Q1</span>
+<p>Add a <code>year</code> field to <code>Student</code> (for example <code>IntegerField()</code>) and show it in the list, the form, and the edit view. Remember the two migration commands.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q2</span>
+<p>Show "Total students: 5" above the table. Hint: <code>{{ students|length }}</code>.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q3</span>
+<p>Show the newest student first. Hint: <code>Student.objects.all().order_by(&#39;-id&#39;)</code> in <code>student_list</code>.</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q4</span>
+<p>Build the same four pages for a new model called <code>Book</code> with <code>title</code>, <code>author</code> and <code>price</code> (<code>DecimalField(max_digits=6, decimal_places=2)</code>).</p>
+</div>
+      <div class="practice-block">
+<span class="qlabel">Q5</span>
+<p>Add a search box above the list. Typing "BCA" shows only students from BCA. Hint: read <code>request.GET.get(&#39;q&#39;)</code> and use <code>filter(department=q)</code>.</p>
+</div>
+
+      <div class="callout"><p><strong>Why not use Django admin for everything?</strong> The admin you saw in Part 7 is
+      already a complete CRUD tool — for <em>you</em>, the site owner. The pages in this section are the same four
+      jobs built for your <em>visitors</em>, with your own design and rules. Real projects use both.</p></div>
+    </div>
+  </section>
+
+  <section id="next">
+    <div class="sec-num">9</div>
+    <div class="sec-body">
+      <h2>What comes next</h2>
+      <p class="lede">Once this feels comfortable, the rest of the course builds on it directly.</p>
+      <p>You now have the full loop: a page, a form, a view, and a database that remembers. Next come
+      <strong>sessions</strong> (so a site remembers who is logged in), Django's built-in
+      <strong>User</strong> system, <strong>Django Forms</strong> that build and check forms for you, and
+      <strong>template inheritance</strong> so pages share one layout. Every one of them still runs through
+      the same loop used here — a URL, a view, a template — nothing learned so far gets thrown away.</p>
+    </div>
+  </section>
 
 </main>
 
@@ -1264,3 +1562,5 @@ admin.site.register(Member, MemberAdmin)</pre>
 
 </body>
 </html>
+
+</body></html>
